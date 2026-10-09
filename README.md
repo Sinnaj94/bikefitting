@@ -4,9 +4,10 @@ Estimate your bike fit from a side-view video. Uses MediaPipe pose detection to 
 
 ## Install
 
+Requires [uv](https://docs.astral.sh/uv/).
+
 ```sh
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+uv sync
 ```
 
 The pose model (~30 MB) is downloaded on first run.
@@ -14,8 +15,8 @@ The pose model (~30 MB) is downloaded on first run.
 ## Usage
 
 ```sh
-python bikefit.py ride.mov
-python bikefit.py ride.mov --height 180
+uv run bikefit.py ride.mov
+uv run bikefit.py ride.mov --height 180
 ```
 
 | Option | Description |

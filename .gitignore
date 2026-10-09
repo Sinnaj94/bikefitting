@@ -5,3 +5,4 @@ __pycache__/
 *_bikefit/
 *.mov
 *.mp4
+.python-version
