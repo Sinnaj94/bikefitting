@@ -1,0 +1,7 @@
+bikefit-env/
+.venv/
+__pycache__/
+*.task
+*_bikefit/
+*.mov
+*.mp4
