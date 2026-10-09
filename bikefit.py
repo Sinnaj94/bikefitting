@@ -94,7 +94,7 @@ def load_model():
     return MODEL_FILE
 
 
-def detect_poses(video):
+def detect_poses(video, preview=True):
     import mediapipe as mp
     from mediapipe.tasks import python as mp_tasks
     from mediapipe.tasks.python import vision
@@ -111,6 +111,7 @@ def detect_poses(video):
     total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 0
 
     poses = []  # per frame: (33, 3) array of x, y, visibility, or None
+    score = [0.0, 0.0]  # running visibility per side, for the preview
     with vision.PoseLandmarker.create_from_options(opts) as landmarker:
         while True:
             ok, frame = cap.read()
@@ -122,9 +123,18 @@ def detect_poses(video):
             res = landmarker.detect_for_video(img, int(len(poses) * 1000 / fps))
             poses.append(np.array([[q.x * w, q.y * h, q.visibility] for q in res.pose_landmarks[0]])
                          if res.pose_landmarks else None)
+            if preview and poses[-1] is not None:
+                for k in (0, 1):
+                    score[k] += np.mean([poses[-1][IDX[n][k], 2] for n in ("hip", "knee", "ankle")])
+                cv2.imshow("bikefit preview (q to close)",
+                           draw(frame, poses[-1], int(score[1] > score[0]), None))
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    preview = False
+                    cv2.destroyAllWindows()
             if total and len(poses) % 30 == 0:
                 print(f"\r  frame {len(poses)}/{total}", end="", flush=True)
     cap.release()
+    cv2.destroyAllWindows()
     print(f"\r  frame {len(poses)}/{len(poses)}")
     return poses, fps
 
@@ -292,7 +302,7 @@ def draw(frame, pose, s, label):
     return frame
 
 
-def write_outputs(video, poses, s, rows, res, outdir, with_video, preview):
+def write_outputs(video, poses, s, rows, res, outdir, with_video):
     cap = cv2.VideoCapture(video)
     writer = None
     i = 0
@@ -307,23 +317,15 @@ def write_outputs(video, poses, s, rows, res, outdir, with_video, preview):
         if i == res["tdc_frame"]:
             cv2.imwrite(os.path.join(outdir, "top.png"),
                         draw(frame.copy(), pose, s, f"Top  {res['tdc_knee']:.0f} deg"))
-        if with_video or preview:
+        if with_video:
+            if writer is None:
+                h, w = frame.shape[:2]
+                writer = cv2.VideoWriter(os.path.join(outdir, "annotated.mp4"),
+                                         cv2.VideoWriter_fourcc(*"mp4v"), res["fps"], (w, h))
             label = "BOTTOM" if i in res["bdc"] else "TOP" if i in res["tdc"] else None
-            annotated = draw(frame, pose, s, label)
-            if with_video:
-                if writer is None:
-                    h, w = frame.shape[:2]
-                    writer = cv2.VideoWriter(os.path.join(outdir, "annotated.mp4"),
-                                             cv2.VideoWriter_fourcc(*"mp4v"), res["fps"], (w, h))
-                writer.write(annotated)
-            if preview:
-                cv2.imshow("bikefit (q to stop preview)", annotated)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    preview = False
-                    cv2.destroyAllWindows()
+            writer.write(draw(frame, pose, s, label))
         i += 1
     cap.release()
-    cv2.destroyAllWindows()
     if writer:
         writer.release()
 
@@ -339,7 +341,7 @@ def main():
     ap.add_argument("video")
     ap.add_argument("--side", choices=["left", "right"], help="body side facing the camera (default: auto)")
     ap.add_argument("--height", type=float, help="body height in cm, gives saddle change in mm")
-    ap.add_argument("--no-preview", action="store_true", help="do not show the live preview window")
+    ap.add_argument("--no-preview", action="store_true", help="do not show the live window while analyzing")
     ap.add_argument("--no-video", action="store_true", help="skip the annotated video")
     a = ap.parse_args()
 
@@ -347,7 +349,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     print("Detecting pose ...")
-    poses, fps = detect_poses(a.video)
+    poses, fps = detect_poses(a.video, not a.no_preview)
     s = {"left": 0, "right": 1}.get(a.side) if a.side else pick_side(poses)
 
     rows = measure(poses, s)
@@ -357,7 +359,7 @@ def main():
         f.write(text + "\n")
 
     print("Writing outputs ...")
-    write_outputs(a.video, poses, s, rows, res, outdir, not a.no_video, not a.no_preview)
+    write_outputs(a.video, poses, s, rows, res, outdir, not a.no_video)
 
     print(f"\n{text}\n\nResults in: {outdir}/")
 
