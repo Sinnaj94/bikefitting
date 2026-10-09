@@ -292,7 +292,7 @@ def draw(frame, pose, s, label):
     return frame
 
 
-def write_outputs(video, poses, s, rows, res, outdir, with_video):
+def write_outputs(video, poses, s, rows, res, outdir, with_video, preview):
     cap = cv2.VideoCapture(video)
     writer = None
     i = 0
@@ -307,15 +307,23 @@ def write_outputs(video, poses, s, rows, res, outdir, with_video):
         if i == res["tdc_frame"]:
             cv2.imwrite(os.path.join(outdir, "top.png"),
                         draw(frame.copy(), pose, s, f"Top  {res['tdc_knee']:.0f} deg"))
-        if with_video:
-            if writer is None:
-                h, w = frame.shape[:2]
-                writer = cv2.VideoWriter(os.path.join(outdir, "annotated.mp4"),
-                                         cv2.VideoWriter_fourcc(*"mp4v"), res["fps"], (w, h))
+        if with_video or preview:
             label = "BOTTOM" if i in res["bdc"] else "TOP" if i in res["tdc"] else None
-            writer.write(draw(frame, pose, s, label))
+            annotated = draw(frame, pose, s, label)
+            if with_video:
+                if writer is None:
+                    h, w = frame.shape[:2]
+                    writer = cv2.VideoWriter(os.path.join(outdir, "annotated.mp4"),
+                                             cv2.VideoWriter_fourcc(*"mp4v"), res["fps"], (w, h))
+                writer.write(annotated)
+            if preview:
+                cv2.imshow("bikefit (q to stop preview)", annotated)
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    preview = False
+                    cv2.destroyAllWindows()
         i += 1
     cap.release()
+    cv2.destroyAllWindows()
     if writer:
         writer.release()
 
@@ -331,6 +339,8 @@ def main():
     ap.add_argument("video")
     ap.add_argument("--side", choices=["left", "right"], help="body side facing the camera (default: auto)")
     ap.add_argument("--height", type=float, help="body height in cm, gives saddle change in mm")
+    ap.add_argument("--preview", type=lambda v: v.lower() not in ("false", "0", "no"), default=True,
+                    metavar="true|false", help="show a live preview while rendering (default: true)")
     ap.add_argument("--no-video", action="store_true", help="skip the annotated video")
     a = ap.parse_args()
 
@@ -348,7 +358,7 @@ def main():
         f.write(text + "\n")
 
     print("Writing outputs ...")
-    write_outputs(a.video, poses, s, rows, res, outdir, not a.no_video)
+    write_outputs(a.video, poses, s, rows, res, outdir, not a.no_video, a.preview)
 
     print(f"\n{text}\n\nResults in: {outdir}/")
 
