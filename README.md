@@ -23,7 +23,7 @@ uv run bikefit.py ride.mov --height 180
 | --- | --- |
 | `--height CM` | Body height, gives the saddle change in mm |
 | `--side left\|right` | Side facing the camera (default: auto) |
-| `--preview true\|false` | Live preview window while rendering, `q` closes it (default: true) |
+| `--no-preview` | Skip the live preview window (`q` closes it) |
 | `--no-video` | Skip the annotated video |
 
 Output goes to `<video>_bikefit/`: `report.txt`, `frames.csv`, `top.png`, `bottom.png`, `annotated.mp4`.

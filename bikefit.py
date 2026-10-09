@@ -339,8 +339,7 @@ def main():
     ap.add_argument("video")
     ap.add_argument("--side", choices=["left", "right"], help="body side facing the camera (default: auto)")
     ap.add_argument("--height", type=float, help="body height in cm, gives saddle change in mm")
-    ap.add_argument("--preview", type=lambda v: v.lower() not in ("false", "0", "no"), default=True,
-                    metavar="true|false", help="show a live preview while rendering (default: true)")
+    ap.add_argument("--no-preview", action="store_true", help="do not show the live preview window")
     ap.add_argument("--no-video", action="store_true", help="skip the annotated video")
     a = ap.parse_args()
 
@@ -358,7 +357,7 @@ def main():
         f.write(text + "\n")
 
     print("Writing outputs ...")
-    write_outputs(a.video, poses, s, rows, res, outdir, not a.no_video, a.preview)
+    write_outputs(a.video, poses, s, rows, res, outdir, not a.no_video, not a.no_preview)
 
     print(f"\n{text}\n\nResults in: {outdir}/")
 
